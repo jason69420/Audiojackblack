@@ -371,10 +371,19 @@ const WORD_TO_RANK = {
 const RANK_VALUE = { 'A':11,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':10,'Q':10,'K':10 };
 
 // Returns an ARRAY of card ranks for a single spoken token.
-// Speech often glues adjacent numbers together ("nine seven" -> "97"),
-// so a numeric token is split into its individual card digits.
+// Speech often glues adjacent cards together: numbers as "97", or words
+// joined by a hyphen like "nine-nine" or "king-nine". We split those apart.
 function tokenToRanks(w) {
-  w = w.toLowerCase().replace(/[^a-z0-9]/g,'');
+  w = w.toLowerCase();
+
+  // hyphen-joined words/numbers, e.g. "nine-nine", "king-nine", "9-7"
+  if (w.includes('-')) {
+    const out = [];
+    for (const part of w.split('-')) out.push(...tokenToRanks(part));
+    return out;
+  }
+
+  w = w.replace(/[^a-z0-9]/g,'');
   if (!w) return [];
   if (WORD_TO_RANK[w]) return [WORD_TO_RANK[w]];
 
@@ -389,7 +398,30 @@ function tokenToRanks(w) {
     }
     return out;
   }
+
+  // glued words with no separator, e.g. "ninenine" -> try to peel known words
+  const peeled = peelGluedWords(w);
+  if (peeled.length) return peeled;
+
   return [];
+}
+
+// Greedily peel known card words from a run-together string like "ninenine".
+// Longest-match first so "ten"/"king" win before single letters.
+const WORD_KEYS = Object.keys(WORD_TO_RANK)
+  .filter(k => k.length >= 2)            // skip single letters to avoid noise
+  .sort((a,b) => b.length - a.length);
+function peelGluedWords(s) {
+  const out = [];
+  let i = 0, guard = 0;
+  while (i < s.length && guard++ < 20) {
+    let matched = false;
+    for (const key of WORD_KEYS) {
+      if (s.startsWith(key, i)) { out.push(WORD_TO_RANK[key]); i += key.length; matched = true; break; }
+    }
+    if (!matched) { i++; }      // skip a stray character and keep going
+  }
+  return out;
 }
 
 // flatten a list of spoken word-tokens into a flat list of card ranks
