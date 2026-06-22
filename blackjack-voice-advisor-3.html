@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Blackjack Voice Advisor</title>
+<style>
+  :root {
+    --felt:        #0c4a35;
+    --felt-deep:   #07301f;
+    --brass:       #d9b86a;
+    --brass-bright:#f0d99a;
+    --cream:       #f3ecdd;
+    --ink:         #0a1f17;
+    --hit:         #e0533d;
+    --stand:       #4a9d6b;
+    --double:      #e0a83d;
+    --split:       #5b8fd6;
+    --unclear:     #8a8378;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background:
+      radial-gradient(ellipse 120% 80% at 50% -10%, var(--felt) 0%, var(--felt-deep) 70%),
+      var(--felt-deep);
+    color: var(--cream);
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 18px calc(24px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+  }
+
+  /* felt stitching frame */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 10px;
+    border: 2px dashed rgba(217,184,106,0.35);
+    border-radius: 18px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: 460px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+  }
+
+  header { text-align: center; margin-top: 6px; }
+
+  .eyebrow {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--brass-bright);
+    text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+  }
+  h1 .sub { display: block; font-size: 13px; font-weight: 400; letter-spacing: 0.06em; color: rgba(243,236,221,0.65); margin-top: 4px; font-style: italic; }
+
+  /* ── result card ── */
+  .verdict {
+    width: 100%;
+    background: linear-gradient(160deg, rgba(255,255,255,0.06), rgba(0,0,0,0.18));
+    border: 1px solid rgba(217,184,106,0.4);
+    border-radius: 16px;
+    padding: 26px 22px;
+    text-align: center;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+    transition: border-color 0.3s;
+  }
+
+  .heard-label {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--brass);
+    opacity: 0.85;
+  }
+  .heard-text {
+    font-size: 17px;
+    font-style: italic;
+    color: var(--cream);
+    min-height: 22px;
+    word-break: break-word;
+  }
+
+  .parsed {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .chip {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid rgba(217,184,106,0.3);
+    border-radius: 999px;
+    padding: 6px 14px;
+    letter-spacing: 0.03em;
+  }
+  .chip b { color: var(--brass-bright); font-weight: 700; }
+
+  .action {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 46px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1;
+    margin-top: 4px;
+  }
+  .action.hit     { color: var(--hit); }
+  .action.stand   { color: var(--stand); }
+  .action.double  { color: var(--double); }
+  .action.split   { color: var(--split); }
+  .action.unclear { color: var(--unclear); font-size: 30px; }
+
+  .reason {
+    font-size: 14px;
+    line-height: 1.5;
+    color: rgba(243,236,221,0.8);
+    font-style: italic;
+    max-width: 340px;
+    margin: 0 auto;
+  }
+
+  .placeholder { color: rgba(243,236,221,0.45); font-style: italic; font-size: 15px; line-height: 1.6; }
+
+  /* ── mic button ── */
+  .mic-zone { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 4px; }
+
+  .mic {
+    width: 108px;
+    height: 108px;
+    border-radius: 50%;
+    border: none;
+    background: radial-gradient(circle at 35% 30%, var(--brass-bright), var(--brass) 55%, #b8954a 100%);
+    color: var(--ink);
+    font-size: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.5);
+    transition: transform 0.12s;
+    position: relative;
+  }
+  .mic:active { transform: scale(0.94); }
+
+  .mic.listening {
+    background: radial-gradient(circle at 35% 30%, #ff7a63, var(--hit) 55%, #b33523 100%);
+    color: #fff;
+    animation: pulse 1.3s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 0 0 rgba(224,83,61,0.55); }
+    70%  { box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 0 22px rgba(224,83,61,0); }
+    100% { box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 0 0 rgba(224,83,61,0); }
+  }
+
+  .mic-hint {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: rgba(243,236,221,0.7);
+    text-align: center;
+    min-height: 18px;
+  }
+
+  .toggles {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .toggle {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: rgba(243,236,221,0.7);
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(217,184,106,0.3);
+    border-radius: 999px;
+    padding: 8px 14px 8px 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .toggle .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: rgba(243,236,221,0.3);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3);
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .toggle[aria-checked="true"] {
+    color: var(--brass-bright);
+    border-color: var(--brass);
+    background: rgba(217,184,106,0.14);
+  }
+  .toggle[aria-checked="true"] .dot {
+    background: var(--brass-bright);
+    box-shadow: 0 0 8px rgba(240,217,154,0.7);
+  }
+
+  details.help {
+    width: 100%;
+    margin-top: 2px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+  details.help summary {
+    cursor: pointer;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--brass);
+    text-align: center;
+    list-style: none;
+    opacity: 0.8;
+  }
+  details.help summary::-webkit-details-marker { display: none; }
+  .help-body {
+    font-size: 13px;
+    line-height: 1.65;
+    color: rgba(243,236,221,0.78);
+    margin-top: 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .help-body code {
+    background: rgba(217,184,106,0.18);
+    color: var(--brass-bright);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .help-body p { margin-bottom: 10px; }
+  .help-body p:last-child { margin-bottom: 0; }
+
+  .unsupported {
+    background: rgba(224,83,61,0.15);
+    border: 1px solid var(--hit);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  footer {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(217,184,106,0.4);
+    text-align: center;
+    margin-top: auto;
+    padding-top: 10px;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">Basic Strategy &middot; Voice</div>
+      <h1>Card Caller
+        <span class="sub">say your cards, dealer&rsquo;s last</span>
+      </h1>
+    </header>
+
+    <div class="verdict" id="verdict">
+      <div class="placeholder" id="placeholder">
+        Tap the chip and say your cards,<br>
+        dealer&rsquo;s card last &mdash; like<br>
+        &ldquo;king, nine, seven&rdquo;
+      </div>
+      <div id="result" style="display:none;">
+        <div class="heard-label">You said</div>
+        <div class="heard-text" id="heard">&mdash;</div>
+        <div class="parsed" id="parsed"></div>
+        <div class="action" id="action"></div>
+        <div class="reason" id="reason"></div>
+      </div>
+    </div>
+
+    <div class="mic-zone">
+      <button class="mic" id="mic" aria-label="Start listening">🎙️</button>
+      <div class="mic-hint" id="hint">Tap to speak</div>
+      <div class="toggles">
+        <button class="toggle" id="autoToggle" role="switch" aria-checked="false">
+          <span class="dot"></span>Auto listen
+        </button>
+        <button class="toggle" id="speakToggle" role="switch" aria-checked="true">
+          <span class="dot"></span>Say it out loud
+        </button>
+      </div>
+    </div>
+
+    <details class="help">
+      <summary>How to say a hand</summary>
+      <div class="help-body">
+        <p>Say your cards in order, and make the <b>dealer&rsquo;s upcard the last one</b> you say. No need to say the word &ldquo;dealer.&rdquo;</p>
+        <p><b>Examples:</b><br>
+        &ldquo;<code>king nine seven</code>&rdquo; &mdash; you have K, 9; dealer 7<br>
+        &ldquo;<code>ace seven six</code>&rdquo; &mdash; you have A, 7; dealer 6<br>
+        &ldquo;<code>eight eight ten</code>&rdquo; &mdash; you have 8, 8; dealer 10<br>
+        &ldquo;<code>five six ace</code>&rdquo; &mdash; you have 5, 6; dealer ace</p>
+        <p>Saying &ldquo;dealer&rdquo; before the last card still works if you prefer, but leaving it out is more reliable.</p>
+        <p>Face cards and ten all count as 10. Two matching cards are read as a pair for splits. An ace is treated as a soft hand automatically.</p>
+        <p><b>Rules used:</b> 6 decks, dealer stands on soft 17, double after split allowed.</p>
+      </div>
+    </details>
+
+    <footer>For practice play only</footer>
+  </div>
+
+<script>
+/* ───────────────────────── Card parsing ───────────────────────── */
+// maps spoken words → card rank value
+const WORD_TO_RANK = {
+  'ace':'A','aces':'A','a':'A','ay':'A','eigh':'A',
+  'two':'2','to':'2','too':'2','2':'2','deuce':'2',
+  'three':'3','tree':'3','3':'3',
+  'four':'4','for':'4','fore':'4','4':'4',
+  'five':'5','5':'5',
+  'six':'6','sex':'6','6':'6',
+  'seven':'7','7':'7',
+  'eight':'8','ate':'8','8':'8',
+  'nine':'9','9':'9',
+  'ten':'10','10':'10','tin':'10',
+  'jack':'J','jacks':'J','j':'J',
+  'queen':'Q','queens':'Q','q':'Q','clean':'Q',
+  'king':'K','kings':'K','k':'K'
+};
+
+const RANK_VALUE = { 'A':11,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':10,'Q':10,'K':10 };
+
+// Returns an ARRAY of card ranks for a single spoken token.
+// Speech often glues adjacent numbers together ("nine seven" -> "97"),
+// so a numeric token is split into its individual card digits.
+function tokenToRanks(w) {
+  w = w.toLowerCase().replace(/[^a-z0-9]/g,'');
+  if (!w) return [];
+  if (WORD_TO_RANK[w]) return [WORD_TO_RANK[w]];
+
+  // pure-digit token: parse digit by digit, keeping "10" together
+  if (/^\d+$/.test(w)) {
+    const out = [];
+    for (let i = 0; i < w.length; i++) {
+      // "10" is the only two-digit card
+      if (w[i] === '1' && w[i+1] === '0') { out.push('10'); i++; continue; }
+      const r = WORD_TO_RANK[w[i]];
+      if (r) out.push(r);
+    }
+    return out;
+  }
+  return [];
+}
+
+// flatten a list of spoken word-tokens into a flat list of card ranks
+function wordsToRanks(words) {
+  const out = [];
+  for (const w of words) out.push(...tokenToRanks(w));
+  return out;
+}
+
+// matches "dealer", "dealers", "dealership(s)", "deal", "dealing", and
+// number-glued forms like "dealer6" / "dealers7"
+const DEALER_RE = /\bdeal(?:er|ers|ership|erships|ing)?\b/;
+
+// returns { player:[ranks], dealer:rank, lostDealer:bool }
+function parseHand(transcript) {
+  const lower = transcript.toLowerCase();
+
+  const match = lower.match(DEALER_RE);
+  if (match) {
+    const before = lower.slice(0, match.index);
+    const after  = lower.slice(match.index + match[0].length);
+
+    const player = wordsToRanks(before.split(/[\s,]+/));
+    let dealerRanks = wordsToRanks(after.split(/[\s,]+/));
+
+    // dealer card present after the keyword
+    if (dealerRanks.length) {
+      return { player, dealer: dealerRanks[0], lostDealer: false };
+    }
+    // keyword swallowed the dealer number (e.g. "dealer six" -> "dealerships").
+    // we can't recover it from the audio.
+    return { player, dealer: null, lostDealer: player.length >= 2 };
+  }
+
+  // no dealer keyword at all: assume the last spoken card is the dealer's
+  const ranks = wordsToRanks(lower.split(/[\s,]+/));
+  if (ranks.length < 2) return { player: ranks, dealer: null, lostDealer: false };
+  return { player: ranks.slice(0, -1), dealer: ranks[ranks.length - 1], lostDealer: false };
+}
+
+/* ───────────────────────── Strategy engine ─────────────────────────
+   6 decks, dealer stands on soft 17, double after split allowed.
+   Actions: HIT, STAND, DOUBLE, SPLIT.  D = double if allowed else hit.
+   Ds = double if allowed else stand.
+*/
+function dealerIndex(d) {
+  // 2..9 -> 2..9, 10/J/Q/K -> 10, A -> 11
+  return RANK_VALUE[d];
+}
+
+function evaluate(player, dealer, lostDealer) {
+  if (!player || player.length < 2) return { action:'UNCLEAR', reason:'I need at least two of your cards. Try again.' };
+  if (!dealer) {
+    if (lostDealer) return { action:'UNCLEAR', reason:'I caught your cards but the dealer\u2019s card got cut off. Try saying it slower: \u201c\u2026 dealer \u2026 six.\u201d' };
+    return { action:'UNCLEAR', reason:'I only caught one card. Say all your cards plus the dealer\u2019s last \u2014 like \u201cking nine seven.\u201d' };
+  }
+
+  const d = dealerIndex(dealer);
+
+  // ---- pairs (exactly two cards, equal value) ----
+  if (player.length === 2) {
+    const pairMove = pairStrategy(player[0], player[1], d);
+    if (pairMove) return pairMove;
+  }
+
+  // ---- compute total & soft ----
+  let total = 0, aces = 0;
+  for (const c of player) { total += RANK_VALUE[c]; if (c === 'A') aces++; }
+  let soft = false;
+  while (total > 21 && aces > 0) { total -= 10; aces--; }
+  soft = aces > 0; // an ace still counted as 11
+
+  if (soft && player.length >= 2) {
+    return softStrategy(total, d, player.length);
+  }
+  return hardStrategy(total, d, player.length);
+}
+
+function pairStrategy(a, b, d) {
+  const va = RANK_VALUE[a], vb = RANK_VALUE[b];
+  if (va !== vb) return null;            // not a pair by value
+  // treat as a pair only when both are the same value
+  const v = va;
+  let split = false;
+  if (a === 'A') split = true;                                  // A,A
+  else if (v === 10) split = false;                             // 10s never split
+  else if (v === 9) split = !(d === 7 || d === 10 || d === 11); // 9,9 stand vs 7,10,A
+  else if (v === 8) split = true;                               // 8,8 always
+  else if (v === 7) split = d >= 2 && d <= 7;
+  else if (v === 6) split = d >= 2 && d <= 6;
+  else if (v === 5) split = false;                              // 5,5 -> hard 10
+  else if (v === 4) split = d === 5 || d === 6;
+  else if (v === 3) split = d >= 2 && d <= 7;
+  else if (v === 2) split = d >= 2 && d <= 7;
+
+  if (split) {
+    return { action:'SPLIT', reason: pairReason(a, d) };
+  }
+  return null; // fall through to hard/soft totals
+}
+
+function pairReason(a, d) {
+  if (a === 'A') return 'Always split aces \u2014 two fresh shots at 21.';
+  if (RANK_VALUE[a] === 8) return 'Always split eights \u2014 16 is the worst hand, two eights is far better.';
+  return 'Pair splits favorably against the dealer\u2019s ' + dealerName(d) + '.';
+}
+
+function softStrategy(total, d, n) {
+  const canDouble = (n === 2);
+  // total here is the soft total (ace as 11), 13..21
+  let action, ds = false;
+  switch (total) {
+    case 21: case 20: action = 'STAND'; break;            // A,9 / A,10
+    case 19: action = (d === 6) ? 'D' : 'STAND'; ds = true; break;
+    case 18:
+      if (d >= 3 && d <= 6) { action = 'D'; ds = true; }
+      else if (d === 2 || d === 7 || d === 8) action = 'STAND';
+      else action = 'HIT';
+      break;
+    case 17: action = (d >= 3 && d <= 6) ? 'D' : 'HIT'; break;
+    case 16: case 15: action = (d >= 4 && d <= 6) ? 'D' : 'HIT'; break;
+    case 14: case 13: action = (d >= 5 && d <= 6) ? 'D' : 'HIT'; break;
+    default: action = 'HIT';
+  }
+  if (action === 'D') action = canDouble ? 'DOUBLE' : (ds ? 'STAND' : 'HIT');
+  return { action, reason: softReason(total, d, action) };
+}
+
+function hardStrategy(total, d, n) {
+  const canDouble = (n === 2);
+  let action;
+  if (total >= 17) action = 'STAND';
+  else if (total >= 13) action = (d >= 2 && d <= 6) ? 'STAND' : 'HIT';
+  else if (total === 12) action = (d >= 4 && d <= 6) ? 'STAND' : 'HIT';
+  else if (total === 11) action = 'D';
+  else if (total === 10) action = (d >= 2 && d <= 9) ? 'D' : 'HIT';
+  else if (total === 9)  action = (d >= 3 && d <= 6) ? 'D' : 'HIT';
+  else action = 'HIT';
+
+  if (action === 'D') action = canDouble ? 'DOUBLE' : 'HIT';
+  return { action, reason: hardReason(total, d, action) };
+}
+
+/* ── reason text ── */
+function dealerName(d) { return d === 11 ? 'ace' : String(d); }
+
+function hardReason(total, d, action) {
+  const dn = dealerName(d);
+  if (action === 'STAND') {
+    if (total >= 17) return 'Hard ' + total + ' \u2014 stand on any 17 or higher.';
+    return 'Hard ' + total + ' against the dealer\u2019s ' + dn + ' \u2014 let them risk the bust.';
+  }
+  if (action === 'DOUBLE') return 'Hard ' + total + ' vs ' + dn + ' \u2014 strong spot to double down.';
+  return 'Hard ' + total + ' against the dealer\u2019s ' + dn + ' \u2014 take a card.';
+}
+
+function softReason(total, d, action) {
+  const dn = dealerName(d);
+  const label = 'soft ' + total;
+  if (action === 'STAND') return label.charAt(0).toUpperCase()+label.slice(1) + ' \u2014 strong enough to stand.';
+  if (action === 'DOUBLE') return label.charAt(0).toUpperCase()+label.slice(1) + ' vs ' + dn + ' \u2014 double for value.';
+  return label.charAt(0).toUpperCase()+label.slice(1) + ' against the dealer\u2019s ' + dn + ' \u2014 hit to improve.';
+}
+
+/* ───────────────────────── UI + Speech ───────────────────────── */
+const micBtn   = document.getElementById('mic');
+const hint     = document.getElementById('hint');
+const placeholder = document.getElementById('placeholder');
+const resultBox= document.getElementById('result');
+const heardEl  = document.getElementById('heard');
+const parsedEl = document.getElementById('parsed');
+const actionEl = document.getElementById('action');
+const reasonEl = document.getElementById('reason');
+const verdict  = document.getElementById('verdict');
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, listening = false, autoMode = false, speakOn = true, manualStop = false;
+
+const autoToggle  = document.getElementById('autoToggle');
+const speakToggle = document.getElementById('speakToggle');
+
+/* ── text to speech ── */
+let speaking = false;
+function speak(text) {
+  if (!speakOn || !('speechSynthesis' in window)) return false;
+  try {
+    window.speechSynthesis.cancel(); // interrupt any prior call-out
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    u.volume = 1.0;
+    speaking = true;
+    u.onend = () => { speaking = false; if (autoMode && !manualStop) restartSoon(); };
+    u.onerror = () => { speaking = false; if (autoMode && !manualStop) restartSoon(); };
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch (_) { speaking = false; return false; }
+}
+
+speakToggle.addEventListener('click', () => {
+  speakOn = !speakOn;
+  speakToggle.setAttribute('aria-checked', speakOn ? 'true' : 'false');
+  if (!speakOn && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+});
+
+function restartSoon() {
+  if (!recog || listening) return;
+  setTimeout(() => {
+    if (autoMode && !manualStop && !listening) {
+      try { recog.start(); } catch (_) {}
+    }
+  }, 350);
+}
+
+if (!SR) {
+  const wrap = document.querySelector('.wrap');
+  const warn = document.createElement('div');
+  warn.className = 'unsupported';
+  warn.innerHTML = 'Speech recognition isn\u2019t supported in this browser. Open this page in <b>Chrome</b> (Android) or <b>Safari</b> (iOS) for voice to work.';
+  wrap.insertBefore(warn, document.querySelector('.help'));
+  micBtn.disabled = true;
+  micBtn.style.opacity = 0.4;
+  autoToggle.disabled = true;
+  autoToggle.style.opacity = 0.4;
+} else {
+  recog = new SR();
+  recog.lang = 'en-US';
+  recog.interimResults = false;
+  recog.maxAlternatives = 3;
+  recog.continuous = false;
+
+  recog.onstart = () => {
+    listening = true;
+    micBtn.classList.add('listening');
+    micBtn.textContent = '⏺';
+    hint.textContent = autoMode ? 'Auto on \u2014 say a hand anytime' : 'Listening\u2026 say your hand';
+  };
+
+  recog.onresult = (e) => {
+    // try alternatives until one parses into a usable hand
+    const alts = Array.from(e.results[0]).map(a => a.transcript);
+    let best = alts[0], parsed = parseHand(alts[0]);
+    for (const t of alts) {
+      const p = parseHand(t);
+      if (p.player.length >= 2 && p.dealer) { best = t; parsed = p; break; }
+    }
+    handle(best, parsed);
+  };
+
+  recog.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      autoMode = false;
+      autoToggle.setAttribute('aria-checked', 'false');
+      hint.textContent = 'Microphone blocked \u2014 allow mic access and retry.';
+    } else if (e.error === 'no-speech') {
+      hint.textContent = autoMode ? 'Auto on \u2014 say a hand anytime' : 'Didn\u2019t catch that. Tap and try again.';
+    }
+  };
+
+  recog.onend = () => {
+    listening = false;
+    micBtn.classList.remove('listening');
+    micBtn.textContent = '🎙️';
+    // in auto mode keep the loop alive, unless the user stopped it or the
+    // app is mid call-out (speak() restarts once it finishes talking)
+    if (autoMode && !manualStop && !speaking) {
+      restartSoon();
+    } else if (!autoMode) {
+      if (hint.textContent.startsWith('Listening')) hint.textContent = 'Tap to speak';
+    }
+    manualStop = false;
+  };
+
+  micBtn.addEventListener('click', () => {
+    if (listening) { manualStop = true; recog.stop(); return; }
+    try { recog.start(); } catch (_) {}
+  });
+
+  autoToggle.addEventListener('click', () => {
+    autoMode = !autoMode;
+    autoToggle.setAttribute('aria-checked', autoMode ? 'true' : 'false');
+    if (autoMode) {
+      manualStop = false;
+      if (!listening) { try { recog.start(); } catch (_) {} }
+      hint.textContent = 'Auto on \u2014 say a hand anytime';
+    } else {
+      manualStop = true;
+      if (listening) { try { recog.stop(); } catch (_) {} }
+      hint.textContent = 'Tap to speak';
+    }
+  });
+}
+
+function stopUI() {
+  listening = false;
+  micBtn.classList.remove('listening');
+  micBtn.textContent = '🎙️';
+  if (hint.textContent.startsWith('Listening')) hint.textContent = 'Tap to speak';
+}
+
+function stopUI() {
+  listening = false;
+  micBtn.classList.remove('listening');
+  micBtn.textContent = '🎙️';
+  if (hint.textContent.startsWith('Listening')) hint.textContent = 'Tap to speak';
+}
+
+function handle(transcript, parsed) {
+  placeholder.style.display = 'none';
+  resultBox.style.display = 'block';
+  heardEl.textContent = '\u201c' + transcript.trim() + '\u201d';
+
+  const res = evaluate(parsed.player, parsed.dealer, parsed.lostDealer);
+
+  // chips
+  parsedEl.innerHTML = '';
+  if (parsed.player && parsed.player.length) {
+    const c = document.createElement('div');
+    c.className = 'chip';
+    c.innerHTML = 'You: <b>' + parsed.player.join(' &middot; ') + '</b>';
+    parsedEl.appendChild(c);
+  }
+  if (parsed.dealer) {
+    const c = document.createElement('div');
+    c.className = 'chip';
+    c.innerHTML = 'Dealer: <b>' + parsed.dealer + '</b>';
+    parsedEl.appendChild(c);
+  }
+
+  const act = res.action.toLowerCase();
+  actionEl.className = 'action ' + act;
+  const labelMap = { hit:'Hit', stand:'Stand', double:'Double', split:'Split', unclear:'Try again' };
+  actionEl.textContent = labelMap[act] || res.action;
+  reasonEl.textContent = res.reason;
+
+  const colorMap = { hit:'var(--hit)', stand:'var(--stand)', double:'var(--double)', split:'var(--split)', unclear:'var(--unclear)' };
+  verdict.style.borderColor = colorMap[act] || 'rgba(217,184,106,0.4)';
+
+  hint.textContent = autoMode ? 'Auto on \u2014 say the next hand' : 'Tap to speak again';
+
+  // announce it out loud
+  const sayMap = { hit:'Hit', stand:'Stand', double:'Double down', split:'Split', unclear:'Try again' };
+  speak(sayMap[act] || res.action);
+}
+</script>
+</body>
+</html>
